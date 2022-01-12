@@ -1,0 +1,1 @@
+{ "index": 0,"version_config": 0.1,"DeviceID": "00001 yopurdeviceid","url_send_data": "url for post request", "url_update_ota_json": "url for firmware.json","url_update_config": "url to get new config.json","time_sleep": 300,"flash_power": 15,"flash_time": 1000,"detect":1,"sendphotos":1,"wifi_ssid": "your SSID","wifi_password": "your_password"  }

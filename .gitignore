@@ -1,0 +1,4 @@
+/.devcontainer
+/build
+/example_test.py
+/sdkconfig.old
