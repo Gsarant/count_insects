@@ -47,7 +47,7 @@ void http_task_send_image(void *pvParameters){
         esp_http_client_set_header(client, "Content-Type", "multipart/form-data; boundary=WebKitFormBoundary7MA4YWxkTrZu0gW");
         esp_http_client_set_header(client, "Connection", "keep-alive");
         esp_http_client_set_header(client, "Cache-Control","no-cache");
-        char dest[7000];
+        char dest[30000];
         const char *boundary1="--WebKitFormBoundary7MA4YWxkTrZu0gW\r\n";
         const char *boundary2="\r\n--WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n";
 
@@ -85,28 +85,34 @@ void http_task_send_image(void *pvParameters){
         memcpy(dest+offset,boundary2,strlen(boundary2));
         offset=offset+strlen(boundary2);
 
-        esp_http_client_set_post_field(client, (const char*)dest, offset);
-        
-        
-        esp_err_t err = esp_http_client_perform(client);
-             
-        if (err == ESP_OK) {
-            ESP_LOGI(TAG_HTTP_REQ, "HTTPS Response Status = %d, content_length = %d",
-                    esp_http_client_get_status_code(client),
-                    esp_http_client_get_content_length(client));
-        } else {
-            ESP_LOGE(TAG_HTTP_REQ, "Error HTTPS Response Status %s", esp_err_to_name(err));
-        }
-        task_rec_parameters_http_task->response_len=esp_http_client_get_content_length(client);
-        ESP_LOGD(TAG_HTTP_REQ,"http len %d", task_rec_parameters_http_task->response_len);
-        if(task_rec_parameters_http_task->response_len> 0){
-            //int data_len = esp_http_client_read(client, task_rec_parameters_http_task->response, task_rec_parameters_http_task->response_len);
-            task_rec_parameters_http_task->response_len = esp_http_client_read_response(client, task_rec_parameters_http_task->response, task_rec_parameters_http_task->response_len);
+        if(client!=NULL){
+            ESP_ERROR_CHECK(esp_http_client_set_post_field(client, (const char*)dest, offset));
+            
+            
+            esp_err_t err = esp_http_client_perform(client);
+                
+            if (err == ESP_OK) {
+                ESP_LOGI(TAG_HTTP_REQ, "HTTPS Response Status = %d, content_length = %d",
+                        esp_http_client_get_status_code(client),
+                        esp_http_client_get_content_length(client));
+            } else {
+                ESP_LOGE(TAG_HTTP_REQ, "Error HTTPS Response Status %s", esp_err_to_name(err));
+            }
+            task_rec_parameters_http_task->response_len=esp_http_client_get_content_length(client);
+            ESP_LOGD(TAG_HTTP_REQ,"http len %d", task_rec_parameters_http_task->response_len);
+            if(task_rec_parameters_http_task->response_len> 0){
+                //int data_len = esp_http_client_read(client, task_rec_parameters_http_task->response, task_rec_parameters_http_task->response_len);
+                task_rec_parameters_http_task->response_len = esp_http_client_read_response(client, task_rec_parameters_http_task->response, task_rec_parameters_http_task->response_len);
 
-            ESP_LOGV(TAG_HTTP_REQ,"\n\n Response Image Data length %i \n Response Data %s \n\n", task_rec_parameters_http_task->response_len,task_rec_parameters_http_task->response);
+                ESP_LOGV(TAG_HTTP_REQ,"\n\n Response Image Data length %i \n Response Data %s \n\n", task_rec_parameters_http_task->response_len,task_rec_parameters_http_task->response);
+            }
+        
+        
+            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_http_client_close(client));
+            //ESP_ERROR_CHECK_WITHOUT_ABORT(esp_http_client_cleanup(client));
+            
+            ESP_LOGI(TAG_HTTP_REQ, "esp_http_client_cleanup");
         }
-        // esp_http_client_close(client);
-        esp_http_client_cleanup(client);
     }   
     vTaskDelay(1000 / portTICK_PERIOD_MS);
    // ESP_LOGD(TAG_HTTP_REQ, "http_event_group  %s  set bit %d",task_rec_parameters_http_task->filename,task_rec_parameters_http_task->CONNECTED_BIT);
@@ -176,7 +182,11 @@ void http_task_post_json2(void *pvParameters){
             int data_read = esp_http_client_read_response(client, rec_parameters_http_task_post_json->response, rec_parameters_http_task_post_json->response_len);
             ESP_LOGV(TAG_HTTP_REQ,"Response data length %i \n Response Data %s", rec_parameters_http_task_post_json->response_len,rec_parameters_http_task_post_json->response);
         }
-        esp_http_client_cleanup(client);
+        if(client!=NULL){
+            ESP_ERROR_CHECK(esp_http_client_cleanup(client));
+            ESP_ERROR_CHECK(esp_http_client_close(client));
+            ESP_LOGI(TAG_HTTP_REQ, "esp_http_client_cleanup");
+        }    
     }   
     stop_wait_request(rec_parameters_http_task_post_json->CONNECTED_BIT);
     vTaskDelete(xHandle);
@@ -210,7 +220,11 @@ void http_task_post_json(void *pvParameters){
             ESP_LOGV(TAG_HTTP_REQ,"Response data length %i \n Response Data %s", rec_parameters_http_task_post_json->response_len,rec_parameters_http_task_post_json->response);
         }
        // esp_http_client_close(client);
-        esp_http_client_cleanup(client);
+        if(client!=NULL){
+            ESP_ERROR_CHECK(esp_http_client_cleanup(client));
+            ESP_ERROR_CHECK(esp_http_client_close(client));
+            ESP_LOGI(TAG_HTTP_REQ, "esp_http_client_cleanup");
+        }    
     }   
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 

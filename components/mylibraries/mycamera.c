@@ -33,7 +33,7 @@
     .pixel_format =PIXFORMAT_GRAYSCALE,
 
     .frame_size = FRAMESIZE_240X240,
-    .jpeg_quality = 10, //0-63 lower number means higher quality
+    .jpeg_quality = 5, //0-63 lower number means higher quality
     .fb_count = 1      //if more than one, i2s runs in continuous mode. Use only with JPEG
 };
 

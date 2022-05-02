@@ -17,7 +17,7 @@
 #define MAX_CONN_FAIL 50
 #define MAX_LENGTH_WIFI_SSID 31
 #define MAX_LENGTH_WIFI_PASS 63
- #define WIFI_CONFIG_NAME "wifi_config.txt"
+#define WIFI_CONFIG_NAME "wifi_config.txt"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,7 +26,7 @@ extern "C" {
 
 EventGroupHandle_t wifi_event_group;
 
-static const int CONNECTED_BIT = BIT0;
+static const int WIFI_CONNECTED_BIT = BIT0;
 static const char *TAGWIFI = "Wifi Module";
 volatile bool wifi_connected ;
 volatile bool wifi_has_ip ;

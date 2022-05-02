@@ -1,45 +1,54 @@
-#include "confing_file.h"
-void write_default_values_to_rec_config_file(Rec_config_file_t *rec_config_file){
-    rec_config_file->index=0;
-    rec_config_file->version_config=0.1;
-    //strcpy(rec_config_file->last_image_file_name,"none");
-    
-    strcpy(rec_config_file->DeviceID,"123");
-    strcpy(rec_config_file->url_send_data, "http://");
-    strcpy(rec_config_file->url_update_ota_json , "http://");
-    strcpy(rec_config_file->url_update_config , "http://");
-    
-    rec_config_file->time_sleep = 60;
-    rec_config_file->flash_power=10;
-    rec_config_file->flash_time=1000;
-    rec_config_file->sendphotos=1;
-    rec_config_file->detect=1;
-    strcpy(rec_config_file->wifi_ssid , "ssid");
-    strcpy(rec_config_file->wifi_password , "password");
+#include "confing_json.h"
+void write_default_values_to_rec_config_file(){
+    strcpy(config_json_string, "{  \"index\": 1, \"version_config\": 0.13, \"DeviceID\": \"ad803f444d93f80e\",\
+         \"url_send_data\": \"http://insectronics.net/binaries/ad803f444d93f80e\",\
+         \"version_firmware\": 0.01,\
+         \"url_update_ota_firmware\": \"https://firmware.insectronics.net/count_insect_gsm_02.bin\",\
+         \"url_update_config\": \"http://insectronics.net/settings/ad803f444d93f80e\",\
+         \"time_sleep\": 86400, \"flash_power\": 5, \"flash_time\": 1000,\
+          \"detect\":1, \"sendphotos\":1,  \
+          \"wifi_ssid\":\"sonic\", \"wifi_password\":\"tr3l0k0m10\" }");
+    root = cJSON_Parse(config_json_string);
+
 }
 
-void read_config_string(const char *config_json_string,Rec_config_file_t *rec_config_file){
-    //ESP_LOGI(TAGCONFIG_FILE, "read_config_string input string %s",config_json_string);
-    cJSON *root = cJSON_Parse(config_json_string);
-    rec_config_file->index = cJSON_GetObjectItem(root,"index")->valueint;
-    rec_config_file->version_config= cJSON_GetObjectItem(root,"version_config")->valuedouble;
-    strcpy(rec_config_file->DeviceID , cJSON_GetObjectItem(root,"DeviceID")->valuestring);
-    //strcpy(rec_config_file->last_image_file_name , cJSON_GetObjectItem(root,"last_image_file_name")->valuestring);
-    strcpy(rec_config_file->url_send_data , cJSON_GetObjectItem(root,"url_send_data")->valuestring);
-    strcpy(rec_config_file->url_update_ota_json , cJSON_GetObjectItem(root,"url_update_ota_json")->valuestring);
-    strcpy(rec_config_file->url_update_config , cJSON_GetObjectItem(root,"url_update_config")->valuestring);
-    rec_config_file->time_sleep = cJSON_GetObjectItem(root,"time_sleep")->valueint;
-    rec_config_file->flash_power=cJSON_GetObjectItem(root,"flash_power")->valueint;
-    rec_config_file->flash_time=cJSON_GetObjectItem(root,"flash_time")->valueint;
-    rec_config_file->detect=cJSON_GetObjectItem(root,"detect")->valueint;
-    rec_config_file->sendphotos=cJSON_GetObjectItem(root,"sendphotos")->valueint;
-    sprintf(rec_config_file->wifi_ssid , cJSON_GetObjectItem(root,"wifi_ssid")->valuestring);
-    sprintf(rec_config_file->wifi_password , cJSON_GetObjectItem(root,"wifi_password")->valuestring);
-  //  ESP_LOGI(TAGCONFIG_FILE, "read_config_string output string %s",cJSON_Print(root));
-    cJSON_Delete(root);
+int get_int_value(const char *name){
+    return cJSON_GetObjectItem(root,name)->valueint;
+}
+double get_double_value(const char *name){
+    return cJSON_GetObjectItem(root,name)->valuedouble;
+}
+char *get_string_value(const char *name){
+    return cJSON_GetObjectItem(root,name)->valuestring;
 }
 
-esp_err_t read_config_file_json(const char *filename, Rec_config_file_t *rec_config_file){
+esp_err_t set_int_value(const char *name,int newvalue){
+    if (cJSON_AddNumberToObject(root, name, newvalue)==NULL) {
+        return ESP_FAIL;
+    }
+    else{
+        return ESP_OK;
+    }
+}
+esp_err_t set_double_value(const char *name,double newvalue){
+    if (cJSON_AddNumberToObject(root, name, newvalue)==NULL) {
+        return ESP_FAIL;
+    }
+    else{
+        return ESP_OK;
+    }
+}
+esp_err_t set_string_value(const char *name,char *newvalue){
+    if (cJSON_AddStringToObject(root, name, newvalue)==NULL) {
+        return ESP_FAIL;
+    }
+    else{
+        return ESP_OK;
+    }
+}
+
+
+esp_err_t read_config_file_json(const char *filename){
     
     struct stat st;
     if (stat(filename, &st) != 0) {
@@ -58,58 +67,35 @@ esp_err_t read_config_file_json(const char *filename, Rec_config_file_t *rec_con
         return ESP_FAIL;
     }
     else{
-        char config_json_string[(int)st.st_size];
+        //char config_json_string[(int)st.st_size];
         fread(config_json_string, (int)st.st_size, 1, f);
         fclose(f); 
         //ESP_LOGI(CONFIG_FILE_NAME, "Read file Data %s size of file %d",config_json_string,(int)st.st_size);
-        read_config_string(config_json_string,rec_config_file);
+        root = cJSON_Parse(config_json_string);
         ESP_LOGI(TAGCONFIG_FILE, "\n Read  Config file from SD size =%d",strlen(config_json_string));
         return ESP_OK;
     }    
 };
 
-void write_config_string(char *config_json_string,Rec_config_file_t *rec_config_file){
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "index", rec_config_file->index);
-    cJSON_AddNumberToObject(root, "version_config", rec_config_file->version_config);
-   // cJSON_AddStringToObject(root, "last_image_file_name", rec_config_file->last_image_file_name);
-    cJSON_AddStringToObject(root, "DeviceID", rec_config_file->DeviceID);
-    cJSON_AddStringToObject(root, "url_send_data", rec_config_file->url_send_data);
-    cJSON_AddStringToObject(root, "url_update_ota_json", rec_config_file->url_update_ota_json);
-    cJSON_AddStringToObject(root, "url_update_config", rec_config_file->url_update_config);
-    cJSON_AddNumberToObject(root, "time_sleep", rec_config_file->time_sleep);
-    
-    cJSON_AddNumberToObject(root, "flash_power", rec_config_file->flash_power);
-    cJSON_AddNumberToObject(root, "flash_time", rec_config_file->flash_time);
-    cJSON_AddNumberToObject(root, "detect", rec_config_file->detect);
 
-    cJSON_AddNumberToObject(root, "sendphotos", rec_config_file->sendphotos);
-    cJSON_AddStringToObject(root, "wifi_ssid", rec_config_file->wifi_ssid);
-    cJSON_AddStringToObject(root, "wifi_password", rec_config_file->wifi_password);
-    strcpy(config_json_string, cJSON_Print(root));
 
-    //ESP_LOGI(TAGCONFIG_FILE, "my_json_string\n%s",config_json_string);
-    cJSON_Delete(root);
 
-}
-
-esp_err_t write_config_file_json(const char *filename,Rec_config_file_t *rec_config_file){
+esp_err_t write_config_file_json(const char *filename){
     FILE* f = fopen(filename, "w");
     if (f == NULL) {
         ESP_LOGE(TAGCONFIG_FILE, "Failed to open file %s for writing ",filename);
         return ESP_FAIL;
     }
     else{
-	    char config_json_string[600];
-        write_config_string(config_json_string,rec_config_file);
-        
+	    strcpy(config_json_string, cJSON_Print(root));
         if(strlen(config_json_string)==0){
             ESP_LOGE(TAGCONFIG_FILE, "Failed to convert rec_config_file to string ");
             return ESP_FAIL;
         }
         //ESP_LOGD(TAGCONFIG_FILE,"\n config_json_string  len=%d  \n%s",strlen(config_json_string),config_json_string);
         ESP_LOGI(TAGCONFIG_FILE, "open file %s for writing ",filename);
-        size_t write_size=fwrite(config_json_string,strlen(config_json_string),1,f);
+        //size_t write_size=fwrite(config_json_string,strlen(config_json_string),1,f);
+        size_t write_size=strlen(config_json_string);
         if(write_size<=0){
             ESP_LOGE(TAGCONFIG_FILE, "Failed to write in file %s size %d", filename,write_size);
             fclose(f); 
@@ -123,7 +109,7 @@ esp_err_t write_config_file_json(const char *filename,Rec_config_file_t *rec_con
 };
 
 
-esp_err_t read_config_nvs(Rec_config_file_t *rec_config_file){
+esp_err_t read_config_nvs(){
     nvs_handle_t my_handle;
     esp_err_t err = nvs_open(STORAGE_NAMESPACE_CONFIG, NVS_READWRITE, &my_handle);
     if (err != ESP_OK) {
@@ -143,22 +129,25 @@ esp_err_t read_config_nvs(Rec_config_file_t *rec_config_file){
             ESP_LOGE(TAGCONFIG_FILE,"Error Get Blob  Config nvs");
             return err;
         }
-        read_config_string(config_json_string,rec_config_file);
+        root = cJSON_Parse(config_json_string);
+
     }
     nvs_close(my_handle);
-    ESP_LOGI(TAGCONFIG_FILE,"\n Read  Config nvs size= %d \n ",sizeof(rec_config_file));
+    ESP_LOGI(TAGCONFIG_FILE,"\n Read  Config nvs size= %d \n ",sizeof(config_json_string));
     return ESP_OK;
 }
 
-esp_err_t save_config_nvs( Rec_config_file_t *rec_config_file){
+esp_err_t save_config_nvs(){
      nvs_handle_t my_handle;
     esp_err_t err = nvs_open(STORAGE_NAMESPACE_CONFIG, NVS_READWRITE, &my_handle);
     if (err != ESP_OK){
         ESP_LOGE(TAGCONFIG_FILE,"Error Open  Config nvs");        
         return err;
     } 
-    char config_json_string[800];
-    write_config_string(config_json_string,rec_config_file);
+    
+    strcpy(config_json_string, cJSON_Print(root));
+    
+
     if(strlen(config_json_string)<=0){
         ESP_LOGE(TAGCONFIG_FILE,"Nothing to Save");
         return ESP_FAIL;
@@ -245,19 +234,23 @@ void check_update_config_task(void *pvParameter) {
                   	
                     if(json_buffer!=NULL)
                     {
-                        cJSON *json = cJSON_Parse(json_buffer);
+                        cJSON *json2 = cJSON_Parse(json_buffer);
                         
-                        if(json == NULL) {
+                        if(json2 == NULL) {
                             ESP_LOGE(TAGCONFIG_FILE,"downloaded file config json is not a valid json, aborting...\n");
                         }else {	
-                            cJSON *version = cJSON_GetObjectItemCaseSensitive(json, "version_config");
+                            cJSON *version = cJSON_GetObjectItemCaseSensitive(json2, "version_config");
                             
                             double new_version = version->valuedouble;
-                            if(new_version > rec_parameters_config_task->rec_config_file_t->version_config) {
-                                read_config_string(json_buffer,rec_parameters_config_task->rec_config_file_t);
-                                ESP_LOGI(TAGCONFIG_FILE," Update new Config Version %.4lf... \n",rec_parameters_config_task->rec_config_file_t->version_config);
+                            double prev_version=get_double_value("version_config");
+                            if(new_version > prev_version) {
+                                
+                                strcpy(config_json_string,json_buffer);
+                                root = cJSON_Parse(config_json_string);
+                                double cur_version=get_double_value("version_config");
+                                ESP_LOGI(TAGCONFIG_FILE," Update new Config Version %.4lf... \n",cur_version);
                             }else{
-                                ESP_LOGI(TAGCONFIG_FILE," Keep Config Version %.4lf... \n",rec_parameters_config_task->rec_config_file_t->version_config);
+                                ESP_LOGI(TAGCONFIG_FILE," Keep Config Version %.4lf... \n",prev_version);
                             }
                         }
                     }

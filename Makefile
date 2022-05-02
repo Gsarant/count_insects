@@ -3,6 +3,6 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := count_insects
+PROJECT_NAME := count_insects_gsm
 
 include $(IDF_PATH)/make/project.mk

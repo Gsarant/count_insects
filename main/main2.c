@@ -19,12 +19,12 @@
 
 
 #define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
-#include "esp_log.h"
+#include <esp_log.h>
 
-#include "confing_json.h"
+#include "confing_file.h"
 
-#define Version 0.03
-//#define SDCARD
+#define Version 0.01
+#define SDCARD
 
 //#define NEWCONFIG
 #define NETWORK
@@ -33,7 +33,7 @@
 #define REALTIMECLOCK
 #define CAMERA
 #define HTTP
-#define OTA
+//#define OTA
 //#define SAVE_IMAGE
 #define SLEEP
 #define TFMICRO
@@ -90,6 +90,7 @@
 
 //General Variables
 static const char *TAG = "main";
+Rec_config_file_t rec_config_file;
 bool is_init_camera=false;
 const char *key = "nvs_image";
 
@@ -110,8 +111,8 @@ esp_err_t nvs_init(void);
 #endif//NETWORK
 
 #ifdef HTTP
-    void send_image(char *jpg_file ,uint8_t *_jpg_buf,size_t _jpg_buf_len);
-    void send_json_data();
+    void send_image(Rec_config_file_t *rec_config_file ,char *jpg_file ,uint8_t *_jpg_buf,size_t _jpg_buf_len);
+    void send_json_data(Rec_config_file_t *rec_config_file);
 #endif//HTTP
 
 #ifdef REALTIMECLOCK
@@ -123,9 +124,6 @@ esp_err_t nvs_init(void);
 
 void app_main(void)
 {
-    ESP_LOGI(TAG,"*****************  MEM Start %f   *******************",Version);
-
-    
     ESP_LOGD(TAG,"*****************  MEM Start %d   *******************",heap_caps_get_free_size(MALLOC_CAP_8BIT));
     nvs_init();
     #ifdef CAMERA
@@ -153,34 +151,35 @@ void app_main(void)
                     //Initialization Config File
                     ESP_LOGI(TAG, "Initialization Config File ");
                     sprintf(config_filename,"%s/%s",MOUNT_POINT,CONFIG_FILE_NAME);
-                    esp_err_t err=read_config_file_json(config_filename);
+                    esp_err_t err=read_config_file_json(config_filename, &rec_config_file);
                 // ESP_ERROR_CHECK(err);
                     if(err==ESP_FAIL){
                         ESP_LOGE(TAG, "\n There is not Config file to SD card \n");
                         ESP_LOGI(TAG, "Try to Load Config from nvs" );
-                        if(read_config_nvs()!=ESP_OK){
+                        if(read_config_nvs(&rec_config_file)!=ESP_OK){
                             ESP_LOGE(TAG, "\n There is not Config file to nvs \n");
                             ESP_LOGI(TAG, "Try to Load embeded Config" );
-                            write_default_values_to_rec_config_file());
+                            write_default_values_to_rec_config_file(&rec_config_file);
                             ESP_LOGI(TAG, "Init Config From code");
                         }
                 
                     }else {
-                        ESP_LOGI(TAG, "index:%d  filename:%s \n",get_double_value("version_config"), get_string_value("url_update_config"));
+                        ESP_LOGI(TAG, "index:%d  filename:%s \n",rec_config_file.index, rec_config_file.last_image_file_name);
                     }
                     ESP_LOGD(TAG,"*****************  MEM after sd init  %d   *******************",heap_caps_get_free_size(MALLOC_CAP_8BIT));
                 }
             #else
                 ESP_LOGI(TAG, "Try to Load Config from nvs");
-                if(read_config_nvs()!=ESP_OK){
+                if(read_config_nvs(&rec_config_file)!=ESP_OK){
                     ESP_LOGE(TAG, "\n There is not Config file to nvs \n");
                     ESP_LOGI(TAG, "Try to Load embeded Config" );
-                    write_default_values_to_rec_config_file();
+
+                    write_default_values_to_rec_config_file(&rec_config_file);
                     ESP_LOGI(TAG, "Init Config From code");
                 }
             #endif //SDCARD   
     #endif //NEWCONFIG   
-    ESP_LOGI(TAG, "Current  Config Version %lf",get_double_value("version_config"));
+    ESP_LOGI(TAG, "Current  Config Version %lf",rec_config_file.version_config);
 
     
     #ifdef REALTIMECLOCK
@@ -229,10 +228,10 @@ void app_main(void)
     #ifdef NETWORK
     //Update Config File
         ESP_LOGI(TAG, "UpDate Config");
-        ESP_LOGI(TAG, "Current  Config Version %lf",get_double_value("version_config"));
+        ESP_LOGI(TAG, "Current  Config Version %lf",rec_config_file.version_config);
         Rec_parameters_config_task rec_parameters_config_task;
-        strcpy(rec_parameters_config_task.url_update_config_json,get_string_value("url_update_config"));
-        
+        strcpy(rec_parameters_config_task.url_update_config_json,rec_config_file.url_update_config);
+        rec_parameters_config_task.rec_config_file_t=&rec_config_file;
         #ifdef WIFI
             if(!wifi_connected)
                 int_net();
@@ -255,13 +254,12 @@ void app_main(void)
                     ESP_LOGD(TAG,"*****************  MEM  after xEventGroupWaitBits %d   *******************",heap_caps_get_free_size(MALLOC_CAP_8BIT));
                 }
                 
-                if(get_double_value("version_config") < rec_parameters_config_task.version){
+                if(rec_config_file.version_config < rec_parameters_config_task.rec_config_file_t->version_config){
                     #ifdef SDCARD
-                        write_config_file_json(config_filename);
-                        save_config_nvs();
+                        write_config_file_json(config_filename,rec_parameters_config_task.rec_config_file_t);
+                        save_config_nvs(rec_parameters_config_task.rec_config_file_t);
                     #else
-                        save_config_nvs();
-                        
+                        save_config_nvs(rec_parameters_config_task.rec_config_file_t);
                     #endif//SDCARD
                 }
         #ifdef WIFI
@@ -284,8 +282,8 @@ void app_main(void)
         if(is_init_camera==true){
             //Capture Foto  
             //ESP_LOGI(TAG,"Flash Enable");
-            flash_on(get_int_value("flash_power"));
-            vTaskDelay(get_int_value("flash_time") / portTICK_PERIOD_MS);
+            flash_on(rec_config_file.flash_power);
+            vTaskDelay(rec_config_file.flash_time / portTICK_PERIOD_MS);
             camera_fb_t * fb = NULL;    
             fb = esp_camera_fb_get();
             if (!fb) {
@@ -293,7 +291,7 @@ void app_main(void)
             } else {
                // ESP_LOGI(TAG, "Camera capture");
             }   
-            vTaskDelay(get_int_value("flash_time") / portTICK_PERIOD_MS);
+            vTaskDelay(rec_config_file.flash_time / portTICK_PERIOD_MS);
             flash_off();     
             ESP_LOGI(TAG,"Flash Disable");
             ESP_LOGD(TAG,"*****************  MEM Camera Capture %d   *******************",heap_caps_get_free_size(MALLOC_CAP_8BIT));
@@ -303,11 +301,12 @@ void app_main(void)
             }else{
                 int pred=-1;
                 #ifdef TFMICRO
-                    if(get_int_value("detect")==1){
+                    if(rec_config_file.detect==1){
                         time_t now_1 = time(0);
                         pred=getPredict(fb->buf,IMAGE_SIZE_ROW,IMAGE_SIZE_COL,1);
                         ESP_LOGI(TAG,"Predict %d",pred);
                         time_t now_2 =time(0) ;
+                        time_t differ =now_2-now_1;
                         ESP_LOGI(TAG,"** total predict time  %ld **",time(0)-now_1);
                     }
                     else{
@@ -320,9 +319,8 @@ void app_main(void)
                     uint8_t * _jpg_buf=NULL;
                     size_t _jpg_buf_len=0;
                     char jpg_file[FILENAMESIZE];
-                    int index=get_int_value("index");
-                    set_int_value("index",index+1);
-                    sprintf(jpg_file,"%s/%s_%d_%d.jpg",MOUNT_POINT,timename, get_int_value("index"),pred);
+                    rec_config_file.index=rec_config_file.index+1;
+                    sprintf(jpg_file,"%s/%s_%d_%d.jpg",MOUNT_POINT,timename, rec_config_file.index,pred);
                     fmt2jpg(fb->buf,IMAGE_SIZE_ROW*IMAGE_SIZE_COL, IMAGE_SIZE_ROW, IMAGE_SIZE_COL, PIXFORMAT_GRAYSCALE, QUALITY_OF_JPG_IMAGE, &_jpg_buf, &_jpg_buf_len);
                     ESP_LOGD(TAG," Image  %s convert to jpg old Size %d New Size %d",jpg_file ,IMAGE_SIZE_ROW*IMAGE_SIZE_COL,_jpg_buf_len );
 
@@ -335,14 +333,13 @@ void app_main(void)
                         #endif//SAVE_IMAGE    
                         
                     #endif//SDCARD
-                    char lastimagename[200];
-                    sprintf(lastimagename,"%s/%s_%d",MOUNT_POINT,timename,get_int_value("index"));
-                    set_string_value("lastname",lastimagename);
+
+                    sprintf(rec_config_file.last_image_file_name,"%s/%s_%d",MOUNT_POINT,timename,rec_config_file.index);
                 
                     #ifdef HTTP
-                        if(get_int_value("sendphotos")==1){
+                        if(rec_config_file.sendphotos==1){
                             if(_jpg_buf_len>0)
-                                send_image(jpg_file,_jpg_buf,_jpg_buf_len);
+                                send_image(&rec_config_file ,jpg_file,_jpg_buf,_jpg_buf_len);
                             }
                             else{
                                 ESP_LOGI(TAG,"No Send Photo from config");
@@ -357,20 +354,19 @@ void app_main(void)
     #endif //CAMERA
     
     #ifdef SDCARD
-        write_config_file_json(config_filename);
-        save_config_nvs();
+        write_config_file_json(config_filename,rec_parameters_config_task.rec_config_file_t);
+        save_config_nvs(rec_parameters_config_task.rec_config_file_t);
     #else
-        save_config_nvs();
+        save_config_nvs(rec_parameters_config_task.rec_config_file_t);
     #endif//SDCARD
     
     #ifdef OTA
-        ESP_LOGE(TAG,"*****************  OTA %d   *******************",heap_caps_get_free_size(MALLOC_CAP_8BIT));
-
         Rec_parameters_ota_task rec_parameters_ota_task;
-        strcpy(rec_parameters_ota_task.url_update_ota_firmware,get_string_value("url_update_ota_firmware"));
+        strcpy(rec_parameters_ota_task.url_update_ota_json,rec_config_file.url_update_ota_json);
         rec_parameters_ota_task.firmware_version=Version;
-        rec_parameters_ota_task.new_firmware_version=get_double_value("version_firmware");
+        
         http_ota_event_group = xEventGroupCreate (); // Create an event group
+
 	    xTaskCreate(&check_update_task, "check_update_task", 8192, (void*)&rec_parameters_ota_task, 5, NULL);  
         wait_ota_request();
     #endif//OTA
@@ -383,9 +379,8 @@ void app_main(void)
     
     
     #ifdef SLEEP
-        int time_sleep=get_int_value("time_sleep");
-        ESP_LOGD(TAG,"Sleep for %d Seconds ",time_sleep);
-        uint64_t sleeptime = UINT64_C(time_sleep * uS_TO_S_FACTOR);
+        ESP_LOGD(TAG,"Sleep for %d Seconds ",rec_config_file.time_sleep);
+        uint64_t sleeptime = UINT64_C(rec_config_file.time_sleep * uS_TO_S_FACTOR);
         esp_sleep_enable_timer_wakeup(sleeptime);
         esp_deep_sleep_start();
     #endif//SLEEP
@@ -418,7 +413,7 @@ void app_main(void)
 #ifdef WIFI
     void int_net(void){
         ESP_LOGD(TAG,"*****************  MEM after nvs_init %d   *******************",heap_caps_get_free_size(MALLOC_CAP_8BIT));
-        wifi_init_stat(get_string_value("wifi_ssid"),get_string_value("wifi_password"));
+        wifi_init_stat(rec_config_file.wifi_ssid,rec_config_file.wifi_password);
         ESP_LOGD(TAG,"*****************  MEM  after wifi init %d   *******************",heap_caps_get_free_size(MALLOC_CAP_8BIT));
         wait_wifi_connect();
     }
@@ -438,7 +433,7 @@ esp_err_t nvs_init(void){
 };
 
 #ifdef HTTP
-void send_json_data(){
+void send_json_data(Rec_config_file_t *rec_config_file){
     #ifdef NETWORK
         #ifdef WIFI
         if(!wifi_connected)
@@ -451,24 +446,21 @@ void send_json_data(){
     #endif//NETWORK
     Rec_parameters_http_task_post_json *rec_parameters_http_task_post_json;
     rec_parameters_http_task_post_json=(Rec_parameters_http_task_post_json *)malloc(sizeof(Rec_parameters_http_task_post_json));
-    strcpy(rec_parameters_http_task_post_json->url_send_data,get_string_value("url_send_data"));
+    strcpy(rec_parameters_http_task_post_json->url_send_data,rec_config_file->url_send_data);
     srand(time(NULL));
     int r = (rand() % (99 - 80)) + 80;
-    time_t temp_now = time(0)+get_int_value("time_sleep");
-    char DevId[30];
-    strcpy(DevId,get_string_value("DeviceID"));
-
+    time_t temp_now = time(0)+rec_config_file->time_sleep;
     #ifdef WIFI
         ESP_LOGV(TAG,"\n************ send_json_data WIFI RSSI %d **************\n",get_wifi_rssi());
-        sprintf(rec_parameters_http_task_post_json->jsondata,"{\"System\":{\"DevId\":\"%s\",\"DevType\":8888,\"Batt\":%d,\"NxtUpdTm\":%ld,\"TotCount\":%d,\"CSQ\":%d}}\r\n",DevId,r,temp_now,1,get_csq_precent());
+        sprintf(rec_parameters_http_task_post_json->jsondata,"{\"System\":{\"DevId\":\"%s\",\"DevType\":8888,\"Batt\":%d,\"NxtUpdTm\":%ld,\"TotCount\":%d,\"CSQ\":%d}}\r\n",rec_config_file->DeviceID,r,temp_now,1,get_csq_precent());
     #endif
     #ifdef GSM
-        sprintf(rec_parameters_http_task_post_json->jsondata,"{\"System\":{\"DevId\":\"%s\",\"DevType\":8888,\"Batt\":%d,\"NxtUpdTm\":%ld,\"TotCount\":%d,\"CSQ\":%d}}\r\n",DevId,r,temp_now,1,0);
+        sprintf(rec_parameters_http_task_post_json->jsondata,"{\"System\":{\"DevId\":\"%s\",\"DevType\":8888,\"Batt\":%d,\"NxtUpdTm\":%ld,\"TotCount\":%d,\"CSQ\":%d}}\r\n",rec_config_file->DeviceID,r,temp_now,1,0);
     #endif
     rec_parameters_http_task_post_json->CONNECTED_BIT=BIT0;
         #ifdef WIFI
          if(wifi_connected==false){
-            wifi_init_stat(get_string_value("wifi_ssid"),get_string_value("wifi_password"));
+            wifi_init_stat(rec_config_file->wifi_ssid,rec_config_file->wifi_password);
             ESP_LOGI(TAG,"*****************  MEM  after wifi init %d   *******************",heap_caps_get_free_size(MALLOC_CAP_8BIT));
             wait_wifi_connect();
         }   
@@ -497,7 +489,7 @@ void send_json_data(){
         }
 }
 
-void send_image(char *jpg_file ,uint8_t* _jpg_buf,size_t _jpg_buf_len){
+void send_image(Rec_config_file_t *rec_config_file ,char *jpg_file ,uint8_t* _jpg_buf,size_t _jpg_buf_len){
     #ifdef NETWORK
         #ifdef WIFI
         if(!wifi_connected)
@@ -512,20 +504,18 @@ void send_image(char *jpg_file ,uint8_t* _jpg_buf,size_t _jpg_buf_len){
         Rec_parameters_http_task rec_parameters_http_task;
         //rec_parameters_http_task=(Rec_parameters_http_task *)malloc(sizeof(Rec_parameters_http_task));
         memcpy(rec_parameters_http_task.filename ,jpg_file,strlen(jpg_file)+1);
-        strcpy(rec_parameters_http_task.url_send_data,get_string_value("url_send_data"));
+        strcpy(rec_parameters_http_task.url_send_data,rec_config_file->url_send_data);
         rec_parameters_http_task.lendata=_jpg_buf_len;
 
-        time_t temp_now = time(0)+get_int_value("time_sleep");
-        char DevId[30];
-        strcpy(DevId,get_string_value("DeviceID"));
+        time_t temp_now = time(0)+rec_config_file->time_sleep;
         #ifdef WIFI
             ESP_LOGV(TAG,"\n************ WIFI RSSI %d **************\n",get_wifi_rssi());
-            sprintf(rec_parameters_http_task.jsondata,"{\"System\":{\"DevId\":\"%s\",\"DevType\":8888,\"Batt\":94,\"NxtUpdTm\":%ld,\"TotCount\":%d,\"CSQ\":%d}}\r\n",DevId,temp_now,1,get_csq_precent());
+            sprintf(rec_parameters_http_task.jsondata,"{\"System\":{\"DevId\":\"%s\",\"DevType\":8888,\"Batt\":94,\"NxtUpdTm\":%ld,\"TotCount\":%d,\"CSQ\":%d}}\r\n",rec_config_file->DeviceID,temp_now,1,get_csq_precent());
         #endif
         #ifdef GSM
             
             int batt=volTAG_GSMe/0.5;
-            sprintf(rec_parameters_http_task.jsondata,"{\"System\":{\"DevId\":\"%s\",\"DevType\":8888,\"Batt\":%d,\"NxtUpdTm\":%ld,\"TotCount\":%d,\"CSQ\":%d}}\r\n",DevId,batt,temp_now,1,rssi);
+            sprintf(rec_parameters_http_task.jsondata,"{\"System\":{\"DevId\":\"%s\",\"DevType\":8888,\"Batt\":%d,\"NxtUpdTm\":%ld,\"TotCount\":%d,\"CSQ\":%d}}\r\n",rec_config_file->DeviceID,batt,temp_now,1,rssi);
         #endif
         rec_parameters_http_task.data=(uint8_t *)malloc(sizeof(uint8_t)*(rec_parameters_http_task.lendata));
         rec_parameters_http_task.response=(Rec_parameters_http_task *)malloc(3000);
@@ -533,7 +523,7 @@ void send_image(char *jpg_file ,uint8_t* _jpg_buf,size_t _jpg_buf_len){
         rec_parameters_http_task.CONNECTED_BIT=BIT0;
         
         esp_http_client_config_t tmp_client_config = {
-            .url = get_string_value("url_send_data"),
+            .url = rec_config_file->url_send_data,
             .timeout_ms = 5000						                    
         };
         rec_parameters_http_task.esp_http_client_config= tmp_client_config;
@@ -545,7 +535,7 @@ void send_image(char *jpg_file ,uint8_t* _jpg_buf,size_t _jpg_buf_len){
         #ifdef WIFI
         if(!wifi_connected)
             if(wifi_connected==false){
-                wifi_init_stat(get_string_value("wifi_ssid"),get_string_value("wifi_password"));
+                wifi_init_stat(rec_config_file->wifi_ssid,rec_config_file->wifi_password);
                 ESP_LOGI(TAG,"*****************  MEM  after wifi init %d   *******************",heap_caps_get_free_size(MALLOC_CAP_8BIT));
                 wait_wifi_connect();
             }

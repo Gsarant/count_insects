@@ -6,10 +6,11 @@
     "idf.espIdfPath": "/home/giannis/esp/esp-idf",
     "idf.espMdfPath": "/home/giannis/.espressif/esp-mdf",
     "idf.openOcdConfigs": ["interface/ftdi/esp32_devkitjv1.cfg","target/esp32.cfg"],
-    "idf.port": "/dev/ttyUSB0",
+    "idf.port": "/dev/ttyUSB2",
     "idf.pythonBinPath": "/home/giannis/.espressif/python_env/idf4.3_py3.8_env/bin/python",
     "idf.toolsPath": "/home/giannis/.espressif",
     "files.associations": {
         "*.inc": "cpp"
-    }
+    },
+    "idf.flashType": "UART"
 }

@@ -22,11 +22,10 @@ extern const char server_cert_pem_end[] asm("_binary_cert_pem_end");
 extern "C" {
 #endif
 typedef struct{
+    char url_update_ota_json[150];
     float firmware_version;
     int response_len;
     char *response;
-    float new_firmware_version;
-    char url_update_ota_firmware[200];
 }Rec_parameters_ota_task;
 
 EventGroupHandle_t http_ota_event_group;

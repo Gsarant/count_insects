@@ -34,7 +34,7 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" {
 #endif
-Rec_config_file_t rec_config_file;
+
 
 
 static const char *TAGFOTOLIB = "Foto library";

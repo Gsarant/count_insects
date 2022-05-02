@@ -21,7 +21,7 @@ esp_err_t network_event_handler(void *ctx, system_event_t *e){
         case SYSTEM_EVENT_STA_GOT_IP:
             ESP_LOGI(TAGWIFI,"WiFi IPv4 received: %s\n", ip4addr_ntoa(&e->event_info.got_ip.ip_info.ip));
             wifi_has_ip = true;
-            xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+            xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
             break;
 
         case SYSTEM_EVENT_STA_LOST_IP:
@@ -50,7 +50,7 @@ esp_err_t network_event_handler(void *ctx, system_event_t *e){
                 ESP_LOGI(TAGWIFI,"Rebooting the system...\n\n");
                 esp_restart();
             }
-            xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+            xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
             break;
 
         case SYSTEM_EVENT_STA_STOP:
@@ -101,7 +101,7 @@ esp_err_t wifi_init_stat(char *ssid,char *password){
 
 void wait_wifi_connect(void){
     if(wifi_event_group!=NULL)
-        xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true,portMAX_DELAY);
+        xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT, false, true,portMAX_DELAY);
 };
 
 int get_wifi_rssi(){
